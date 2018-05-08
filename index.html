@@ -13,21 +13,27 @@
     <div id='right_sidebar' class='sidebar'>
         <p>Throttle</p>
         <input type="text" readOnly="true" value="0" id='throttle' class="dial" data-width="120" data-height="100" data-fgColor="#fff" data-bgColor="#000" data-angleOffset=-125 data-cursor=5 data-angleArc=250 data-min=-100 data-max=100></input>
+        <p>Score:</p>
+        <p id='score'></p>
+        <p>High Score:</p>
+        <p id='highscore'>0</p>
     </div>
     <div id='three'></div>
+    <div id='gameover'>GAME OVER<br>R: Restart</div>
     <div class='sidebar'>
-            <p id='left_sidebar'>
-                W: Throttle Up <br />
-                S: Throttle Down <br />
-                A: Yaw Left <br />
-                D: Yaw Right <br />
-                Left: Roll Left <br />
-                Right: Roll Right <br />
-                Up: Pitch Down <br />
-                Down: Pitch Up <br />    
-            </p>
-            <a href="http://minkcv.com">minkcv.com</a>
-        </div>
+        <p id='left_sidebar'>
+            W: Throttle Up <br />
+            S: Throttle Down <br />
+            A: Yaw Left <br />
+            D: Yaw Right <br />
+            Left: Roll Left <br />
+            Right: Roll Right <br />
+            Up: Pitch Down <br />
+            Down: Pitch Up <br />
+            R: Restart <br />
+        </p>
+        <a href="http://minkcv.com">minkcv.com</a>
+    </div>
     <script src="main.js"></script>
     <script>
         $('.dial').knob();

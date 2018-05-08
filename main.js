@@ -1,27 +1,47 @@
 var threediv = document.getElementById('three');
 var width = threediv.clientWidth;
 var height = threediv.clientHeight;
-var scene = new THREE.Scene();
+var scene;
 var material = new THREE.MeshPhongMaterial( { color: 0xffffff,  side: THREE.DoubleSide } );
 var geometries = [];
 var nGeometries = 40;
 var scale = 3;
-var camera = new THREE.PerspectiveCamera( 75, width / height, 0.1, 100 );
-var cam = new THREE.Object3D();
-cam.add(camera);
+var gameOver;
+var sectorSize = 100;
+var sectors;
+var cam;
+var camera;
+var endPoint;
+var totalDistance;
+var highScore = 0;
 var renderer = new THREE.WebGLRenderer();
 renderer.setSize(width, height);
 threediv.appendChild(renderer.domElement);
 
-var light = new THREE.PointLight( 0xffffff, 1.0, 100 );
-light.isLight = true;
-cam.add( light );
-
-scene.add(cam);
+function init() {
+    scene = new THREE.Scene();
+    gameOver = false;
+    document.getElementById('gameover').style.display = 'none';
+    cam = new THREE.Object3D();
+    camera = new THREE.PerspectiveCamera( 75, width / height, 0.1, 100 );
+    cam.add(camera);
+    var light = new THREE.PointLight( 0xffffff, 1.0, 100 );
+    light.dontRemove = true;
+    cam.add( light );
+    scene.add(cam);
+    sectors = [];
+    throttle = 0;
+    createSpline();
+    animate();
+}
 
 var keysDown = [];
-var keys = { up: 38, down: 40, right: 39, left: 37, a: 65, s: 83, d: 68, w: 87, shift: 16 }
+var keys = { up: 38, down: 40, right: 39, left: 37, a: 65, s: 83, d: 68, w: 87, r: 82 }
 addEventListener("keydown", function(e) {
+    if (e.keyCode == keys.r)
+    {
+        init();
+    }
     Object.keys(keys).forEach(function(key) {
         if (keys[key] == e.keyCode) {
           e.preventDefault();
@@ -40,8 +60,36 @@ function preGenerateGeometry() {
         var w = Math.random() * 15;
         var h = Math.random() * 15;
         var geometry = new THREE.BoxGeometry( l, w, h );
+        geometry.computeBoundingBox();
         geometries.push(geometry);
     }
+}
+
+function createSpline() {
+    var anchors = [];
+    var x = 0, y = 0, z = 0;
+    var nAnchors = 1000;
+    anchors.push(new THREE.Vector3(0, 0, -10));
+    for (var i = 0; i < nAnchors; i++)
+    {
+        x -= Math.random() * 10;
+        y -= Math.random() * 10;
+        z -= Math.random() * 20;
+        anchors.push(new THREE.Vector3(x, y, z));
+    }
+    endPoint = anchors[nAnchors];
+    totalDistance = cam.position.distanceTo(endPoint);
+    var curve = new THREE.CatmullRomCurve3(anchors);
+
+    var points = curve.getPoints( 1000 );
+    var geometry = new THREE.BufferGeometry().setFromPoints( points );
+
+    var lineMaterial = new THREE.LineBasicMaterial( { color : 0x00ff00 } );
+
+    // Create the final object to add to the scene
+    var curveObject = new THREE.Line( geometry, lineMaterial );
+    curveObject.dontRemove = true
+    scene.add(curveObject);
 }
 
 function createStars(sectorX, sectorY, sectorZ) {
@@ -50,9 +98,13 @@ function createStars(sectorX, sectorY, sectorZ) {
     var centerZ = sectorZ * sectorSize;
     var range = sectorSize / 2;
     var separateDistance = 20;
+    var padding = 20;
     for (var x = centerX - range; x < centerX + range; x += separateDistance) {
         for (var y = centerY - range; y < centerY + range; y += separateDistance) {
             for (var z = centerZ - range; z < centerZ + range; z += separateDistance) {
+                var center = new THREE.Vector3(x, y, z);
+                if (cam.position.distanceTo(center) < padding)
+                    continue; // Ensure the player doesn't start in a box.
                 var index = Math.floor(Math.random() * nGeometries);
                 var geometry = geometries[index];
                 var box = new THREE.Mesh( geometry, material );
@@ -65,8 +117,11 @@ function createStars(sectorX, sectorY, sectorZ) {
     }
 }
 
-var sectorSize = 100;
-var sectors = [];
+function isInAABB(point, min, max) {
+    return (point.x < max.x && point.x > min.x &&
+        point.y < max.y && point.y > min.y &&
+        point.z < max.z && point.z > min.z);
+}
 
 var moveSpeed = 0.01;
 var yawSpeed = 0.01;
@@ -75,6 +130,7 @@ var pitchSpeed = 0.03;
 var throttle = 0;
 var maxThrottle = 1;
 var throttleChange = false; // Stop when changing forward/reverse
+var direction = new THREE.Vector3();
 
 function updateCamera() {
     // Roll
@@ -117,7 +173,7 @@ function updateCamera() {
             throttle -= moveSpeed;
     }
 
-    var direction = cam.getWorldDirection();
+    cam.getWorldDirection(direction);
     direction.normalize();
     direction.multiplyScalar(throttle);
 
@@ -173,8 +229,25 @@ function updateWorld() {
     
     for (var i = 0; i < scene.children.length; i++) {
         var obj = scene.children[i];
-        if (obj.isLight)
+        if (obj.dontRemove)
             continue;
+        if (obj.geometry != null) {
+            var min = obj.geometry.boundingBox.min.clone();
+            var max = obj.geometry.boundingBox.max.clone();
+            min.x += obj.position.x;
+            min.y += obj.position.y;
+            min.z += obj.position.z;
+            max.x += obj.position.x;
+            max.y += obj.position.y;
+            max.z += obj.position.z;
+            if (isInAABB(cam.position, min, max)) {
+                gameOver = true;
+                document.getElementById('gameover').style.display = 'block';
+                var score = Math.round(totalDistance - cam.position.distanceTo(endPoint));
+                highScore = Math.max(highScore, score);
+                document.getElementById('highscore').innerHTML = highScore;
+            }
+        }
         if (obj.position.distanceTo(cam.position) > sectorSize * 3) {
             scene.remove(obj);
         }
@@ -184,11 +257,14 @@ function updateWorld() {
 function updateUI() {
     var throttleElem = document.getElementById('throttle');
     throttleElem.value = Math.floor(-throttle * 100);
+    var scoreElem = document.getElementById('score');
+    score.innerHTML = Math.round(totalDistance - cam.position.distanceTo(endPoint));
     $('.dial').trigger('change');
 }
 
 function animate() {
-    requestAnimationFrame( animate );
+    if (!gameOver)
+        requestAnimationFrame( animate );
 
     updateCamera();
     updateWorld();
@@ -198,4 +274,4 @@ function animate() {
 }
 
 preGenerateGeometry();
-animate();
+init();
