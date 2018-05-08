@@ -130,7 +130,6 @@ var pitchSpeed = 0.03;
 var throttle = 0;
 var maxThrottle = 1;
 var throttleChange = false; // Stop when changing forward/reverse
-var direction = new THREE.Vector3();
 
 function updateCamera() {
     // Roll
@@ -173,6 +172,7 @@ function updateCamera() {
             throttle -= moveSpeed;
     }
 
+    var direction = new THREE.Vector3();
     cam.getWorldDirection(direction);
     direction.normalize();
     direction.multiplyScalar(throttle);
